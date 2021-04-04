@@ -8,10 +8,101 @@ import os
 import time
 import sys
 import re
-from common import *
 
 DESTROY = False
 VERBOSE = False
+
+
+################################################################################
+# This is a generated section. Do not edit.
+# Written by SurpriseDog at: https://github.com/SurpriseDog
+
+
+class Eprinter:
+	#Drop in replace to print errors if verbose level higher than setup level
+	#To replace every print statement type: from common import eprint as print
+
+	#Setup: eprint = Eprinter(<verbosity level>).eprint
+	#Simple setup: from common import eprint
+	#Usage: eprint(messages, v=1)
+
+	#Source for colors: https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
+	HEADER = '\033[95m'
+	OKBLUE = '\033[94m'
+	OKCYAN = '\033[96m'
+	OKGREEN = '\033[92m'
+	WARNING = '\033[93m'
+	FAIL = '\033[91m'
+	ENDC = '\033[0m'
+	BOLD = '\033[1m'
+	UNDERLINE = '\033[4m'
+
+	def __init__(self, verbose=1):
+		self.level = verbose
+
+	def eprint(self, *args, v=1, color=None, header=None, **kargs):
+		#Print to stderr
+		verbose = kargs.get('verbose', v)
+		#Will print if verbose >= level
+		if v == 2 and not color:
+			color=f"{self.WARNING}"
+		if v >= 3 and not color:
+			color=f"{self.FAIL}"+f"{self.BOLD}"
+
+		if verbose >= self.level:
+			msg = ' '.join(map(str, args))
+			if color:
+				print(color+msg+f"{self.ENDC}", file=sys.stderr, **kargs)
+			else:
+				print(msg, file=sys.stderr, **kargs)
+			return len(msg)
+		return 0
+
+
+def walk(path, match=None, **kargs):
+	#Walk through directory looking for full filenames
+	#match applies a re.match expression
+
+	for (dirpath, dirnames, filenames) in os.walk(path, **kargs):
+		#print(filenames, dirpath, dirnames)
+		for filename in filenames:
+			if match and re.match(match, filename) or not match:
+				yield os.path.join(dirpath, filename)
+
+
+def warn(*args, header="\n\nWarning:", delay=1/64):
+	time.sleep(eprint(*args, header=header, v=2) * delay)
+
+
+eprint = Eprinter(verbose=1).eprint
+
+
+def rfs(num, mult=1000, digits=3):
+	# A "readable" file size	 
+	# mult is the value of a kilobyte in the filesystem. (1000 or 1024)
+	if abs(num) <  mult:
+		return str(num)+' B'
+	suffix = ' KMGTPEZY'
+	#Faster than using math.log:
+	for x in range(8,-1,-1):
+		magnitude = mult**x
+		if abs(num) >= magnitude:
+			return sig(num / magnitude, digits) + ' ' + suffix[x] + 'B'
+
+
+def sig(num, digits=3):
+	#Return number formatted for significant digits	(formerly get_significant)
+	ret = ("{0:."+str(digits)+"g}").format(num)
+	if 'e' in ret:
+		if abs(num) >= 1:
+			return str(int(num))
+		else:
+			return str(num)
+	else:
+		return ret
+
+
+################################################################################
 
 
 def argfixer():
@@ -166,3 +257,44 @@ def main():
 
 
 if __name__ == "__main__": main()
+
+'''
+&&&&%%%%%&@@@@&&&%%%%##%%%#%%&@@&&&&%%%%%%/%&&%%%%%%%%%%%&&&%%%%%&&&@@@@&%%%%%%%
+%%%%%%%%&@&(((((#%%&%%%%%%%%%&@@&&&&&&%%%&&&&&%%%%%%%%%%%&&&&%&%#((((/#@@%%%%%%%
+&&%%%%%%&@(*,,,,,,,/%&%%%%%%%&@@&&&&&%%&&&&%%&&%%%%%%%%%%&&&%#*,,,,,,*/&@&%%%%%%
+%%%%%%%&@&/*,,,*,*,,*/%&%%%%%&@@&&&&&&%%&&&&&&&%%%%%%&%%%&&%*,,,,,,,,**#@&&%%%%%
+&&&&&%%&@#(**********,*(#&%%%&@&&&&%%%%%%%%%&&&%%%%%%&%&&#*****,*******#@&&%%%%%
+&&&%%%&&#/***/*****/*,**,*%&%&@@&&&&&&&&&&&&&&&%%%%%%&&#*,,,*/******/***(%&%%%%%
+&&&%%%&%/*****///////**,,,,*/%%&&@@@@@@@@@@@@@@@@&&%#*,,,*,*(///////*****#%&%%%%
+@@&%%#&#/,,,*/(//((((//**,,*/#&@@@@@&&&&&&&&&&@@@@@%(/*,,**/(/(((/(//*,,*(&&%%%%
+&&&%##&#*,,,*////((((/*///(&@&@@&&&#%((//(/###%&@&@@@@#//**//(#(///***,.,/&&%%%%
+%%%%%#%#*,,,**////(///((#&&&%@&%%(/*,,......,,/(#%&&&@@@%((/(/#(///**,,,,(&%%%%%
+&&%%%#%%/,..***//(#(#%%&@@@&@%(*.,,..       ...,.,/#@&@@@&&%#(((///**,..,#%%%%%%
+%&%%%%%#*,****/(##&@@@&@@@@&%*,....           ....,,(&@@@@@@&@&%((//****,(%%%%%%
+%&%%%%%#/,**/#&@@@&@@@@@@@&(*,......    .     ..,..,.(&@@@@@@@&@@@&%#**,*(%%%%%%
+&&%%%%#&#(#&@@@&@@@@@@@@%((#@@%&&((,,,,,..,,(**(%@@&@%##(&@@@@@@@@&&@@%#(%%%%%%%
+&&&%%%%%&&&&&&@@@@@@%###%@(,%&/@@&(%(/*,..,*/%##&&,%@(*&@#((%&@@@@@@&&@&%%%%&&%%
+&&%%%%%%&&&@@@@@@@@#((*#@%,#%%&@#%(/**//,****/(#%%%&&%*(@@*/#(&@@@@@@@&&%%%%%%%%
+&&&%%%%%&@@@@&%#/,,,,*,(/%&@@&((%(*,*,,*,**,,*,*#%(#@@&%((**,,,,*#(%&@@&&%%%%%%%
+&&&%%%%%@@@@%*/*,...,*,,/*#(//#****,***********,**/#/##(/*,*,...,*/*/&@@&%%&%%%%
+&&%%%%%%&@@@(//,....,,*/****/,,/**************/***/,,//**/**,....,*//&@@&%%&%%%%
+&&&%%%%%&@@%(/*,. ...,****/*/(//*%&@@&%%%%%%&&&&//*/(*/**/**......,/*#&@&%&&&&%%
+&&%%%%%%&@@%(**,,....,/**/((/,#&&&&&%#((((((%&&&@&%/*/(/**/*,. ..,,*/((#@&&&&&&%
+%&%%%%%%&&#(/**,..,,,***/((,./%&%&&&@&(/#((#@@&&&%&%,,/((*,/*,,..,,,///(%&%&&&&&
+&&%%%%%%&#,**,.,..,,*(//(/,,.,&&&@#&@@##%(#&@&%%@&&#.,,/(((//*,,..,,**,*&%&&%&&&
+&&%##%%%#/**,,,,..,*/((((*...,,#&##%(#%%&%%###%(%&/,.. **((((/,...,,,,**(%%#%%%&
+&&%####(**,,,.,,.,,/(/(//*,,..../%&(##%&&&%%(#%&#, .. .**//(/(*,,..,.,,**/((#%%%
+&&&%#///*,........,/(((//**,.   ,,(#%%%%%%&#%##**.   ,,*//((((*,........,*//(%%%
+%%%%(/**...       .,/(((///*., .,*(#(%%%%%%%%##/*,..,,*///((/*.      .....**/(%%
+%%%%#(,..          .,/((/(//****,/(((###%#%(#///**,,**/((/((*,          .,.,(%%%
+&&%%%#/*...          ,*/(/(/((%%&#&#(/%./.*%(#%#%#&&(((/(/*,.          ..,**(&%%
+&&%%%%(*.....          ..*((/**(#&&&&&&&%%%&%&&&%(/,*/((*..           .,..*(&&%%
+&&%%%%&#*.      .        */(#/*,,*/((%#%%%%%((**,.*/(#(/,       .       ,(%&%%&%
+%%%%%%&%#//**,..           .**(((*,...,,**,,..*,/((/*,.          ...,,//(#%%%%%%
+%%%&&&%(/*,**,..,,.,..       .,,**//**,*,,,*,////*,,.        .,.,...,,,**//#%&%%
+%%%&&%#/*,*,.    ...      ..         ...  ,.. .       .       ...   ..,,*/(#%&%%
+&&&&&%(((*.*... . .*,.   .           .*%%#(,.          .    .*,. ..,.,,**/(%#&%%
+Generated on: 2021-04-04
+Written by SurpriseDog at: https://github.com/SurpriseDog
+<<< All rights reserved unless otherwise stated >>>
+'''
