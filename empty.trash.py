@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 # Usage: ./empty.trash.py
+# Type: -h for help
 # To actually delete run: ./empty.trash.py --destroy
 
 import argparse
