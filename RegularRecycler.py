@@ -3,96 +3,87 @@
 # Type: -h for help
 # To actually delete run: ./empty.trash.py --destroy
 
-import argparse
 import os
 import time
 import sys
 import re
-
-DESTROY = False
-VERBOSE = False
-
+import argparse
 
 ################################################################################
-# This is a generated section. Do not edit.
-# Written by SurpriseDog at: https://github.com/SurpriseDog
-
 
 class Eprinter:
-	#Drop in replace to print errors if verbose level higher than setup level
-	#To replace every print statement type: from common import eprint as print
+	'''Drop in replace to print errors if verbose level higher than setup level
+	To replace every print statement type: from common import eprint as print
 
-	#Setup: eprint = Eprinter(<verbosity level>).eprint
-	#Simple setup: from common import eprint
-	#Usage: eprint(messages, v=1)
+	eprint(v=-1)    # Normally hidden messages
+	eprint(v=0)     # Default level
+	eprint(v=1)     # Priority messages
+	eprint(v=2)     # Warnings
+	eprint(v=3)     # Errors
+	'''
 
-	#Source for colors: https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
-	HEADER = '\033[95m'
-	OKBLUE = '\033[94m'
-	OKCYAN = '\033[96m'
-	OKGREEN = '\033[92m'
-	WARNING = '\033[93m'
-	FAIL = '\033[91m'
-	ENDC = '\033[0m'
+	# Setup: eprint = Eprinter(<verbosity level>).eprint
+	# Simple setup: from common import eprint
+	# Usage: eprint(messages, v=1)
+
+	# Don't forget they must end in 'm'
 	BOLD = '\033[1m'
-	UNDERLINE = '\033[4m'
+	WARNING = '\x1b[1;33;40m'
+	FAIL = '\x1b[0;31;40m'
+	END = '\x1b[0m'
 
-	def __init__(self, verbose=1):
+	def __init__(self, verbose=0):
 		self.level = verbose
 
-	def eprint(self, *args, v=1, color=None, header=None, **kargs):
-		#Print to stderr
-		verbose = kargs.get('verbose', v)
-		#Will print if verbose >= level
-		if v == 2 and not color:
-			color=f"{self.WARNING}"
-		if v >= 3 and not color:
-			color=f"{self.FAIL}"+f"{self.BOLD}"
+	def eprint(self, *args, v=0, color=None, header=None, **kargs):
+		'''Print to stderr
+		Custom color example: color='1;33;40'
+		More colors: https://stackoverflow.com/a/21786287/11343425
+		'''
+		verbose = v
+		# Will print if verbose >= level
+		if verbose < self.level:
+			return 0
 
-		if verbose >= self.level:
-			msg = ' '.join(map(str, args))
-			if color:
-				print(color+msg+f"{self.ENDC}", file=sys.stderr, **kargs)
-			else:
-				print(msg, file=sys.stderr, **kargs)
-			return len(msg)
-		return 0
+		if not color:
+			if v == 2 and not color:
+				color = f"{self.WARNING}"
+			if v >= 3 and not color:
+				color = f"{self.FAIL}" + f"{self.BOLD}"
+		else:
+			color = '\x1b[' + color + 'm'
 
-
-def walk(path, match=None, **kargs):
-	#Walk through directory looking for full filenames
-	#match applies a re.match expression
-
-	for (dirpath, dirnames, filenames) in os.walk(path, **kargs):
-		#print(filenames, dirpath, dirnames)
-		for filename in filenames:
-			if match and re.match(match, filename) or not match:
-				yield os.path.join(dirpath, filename)
+		msg = ' '.join(map(str, args))
+		if header:
+			msg = header + ' ' + msg
+		if color:
+			print(color + msg + f"{self.END}", file=sys.stderr, **kargs)
+		else:
+			print(msg, file=sys.stderr, **kargs)
+		return len(msg)
 
 
-def warn(*args, header="\n\nWarning:", delay=1/64):
-	time.sleep(eprint(*args, header=header, v=2) * delay)
 
-
-eprint = Eprinter(verbose=1).eprint
+def warn(*args, header="\n\nWarning:", delay=1 / 64):
+	time.sleep(Eprinter().eprint(*args, header=header, v=2) * delay)
 
 
 def rfs(num, mult=1000, digits=3):
-	# A "readable" file size	 
-	# mult is the value of a kilobyte in the filesystem. (1000 or 1024)
-	if abs(num) <  mult:
-		return str(num)+' B'
+	'''A "readable" file size
+	mult is the value of a kilobyte in the filesystem. (1000 or 1024)'''
+	if abs(num) < mult:
+		return str(num) + ' B'
 	suffix = ' KMGTPEZY'
-	#Faster than using math.log:
-	for x in range(8,-1,-1):
+	# Faster than using math.log:
+	for x in range(8, -1, -1):
 		magnitude = mult**x
 		if abs(num) >= magnitude:
 			return sig(num / magnitude, digits) + ' ' + suffix[x] + 'B'
 
 
 def sig(num, digits=3):
-	#Return number formatted for significant digits	(formerly get_significant)
-	ret = ("{0:."+str(digits)+"g}").format(num)
+	"Return number formatted for significant digits (formerly get_significant)"
+	ret = ("{0:." + str(digits) + "g}").format(num)
 	if 'e' in ret:
 		if abs(num) >= 1:
 			return str(int(num))
@@ -120,7 +111,6 @@ def argfixer():
 
 def parse_args():
 	'''Parse arguments'''
-	global DESTROY, VERBOSE
 
 	parser = argparse.ArgumentParser(
 		description='Delete older files from trash folders system wide.', allow_abbrev=True)
@@ -139,15 +129,8 @@ def parse_args():
 	parser.add_argument('--verbose', '-v', action='store_true',
 						help="List each file deleted")
 
-	args = parser.parse_args(argfixer())
-	DESTROY = args.destroy
-	VERBOSE = args.verbose
+	return parser.parse_args(argfixer())
 
-	return args
-
-
-def warn(*args, header="\n\nWarning:"):
-	eprint(*args, header=header, v=2)
 
 
 def get_trash():
@@ -158,7 +141,7 @@ def get_trash():
 			if mount.startswith('/sys'):
 				continue
 			if not os.access(mount, os.R_OK):
-				warn("Could not access", mount)
+				print("Could not access", mount)
 				continue
 			for name in os.listdir(mount):
 				if re.match('.Trash-', name):
@@ -198,14 +181,13 @@ def delete(entry, size, age):
 		os.remove(entry.path)
 
 
-def is_empty(path): 
+def is_empty(path):
 	return not next(os.scandir(path), None)
 
 ################################################################################
 
 
-def main():
-	args = parse_args()
+def main(args):
 	min_age = args.min_age * 86400
 	large_min_size = args.large_min_size * 1e6
 	large_min_age = args.large_min_age * 86400
@@ -223,10 +205,10 @@ def main():
 	total_size = 0
 	for dirname in dirs:
 		if not os.path.exists(dirname):
-			warn("Could not find:", dirname)
+			print("Could not find:", dirname)
 			continue
 		if not os.access(dirname, os.W_OK):
-			warn("No permission for:", dirname)
+			print("No permission for:", dirname)
 			continue
 
 		print('\n\n\n\nExploring:', dirname)
@@ -247,16 +229,20 @@ def main():
 				del_size += size
 
 	print("\n")
-	warn(del_count, 'files processed', '= ' + rfs(del_size) if del_size else "")
-	warn(total_count - del_count, 'files remaining',
+	print(del_count, 'files processed', '= ' + rfs(del_size) if del_size else "")
+	print(total_count - del_count, 'files remaining',
 		 '= ' + rfs(total_size - del_size) if total_size - del_size else "")
 
 	if not DESTROY:
-		warn("\nNote: dry_run option was enabled. No files were harmed in the making of this text.")
-		warn("To actually delete run with the flag: --destroy")
+		print("\nNote: dry_run option was enabled. No files were harmed in the making of this text.")
+		print("To actually delete run with the flag: --destroy")
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+	ARGS = parse_args()
+	DESTROY = ARGS.destroy
+	VERBOSE = ARGS.verbose
+	main(ARGS)
 
 '''
 &&&&%%%%%&@@@@&&&%%%%##%%%#%%&@@&&&&%%%%%%/%&&%%%%%%%%%%%&&&%%%%%&&&@@@@&%%%%%%%
@@ -294,7 +280,4 @@ if __name__ == "__main__": main()
 %%%&&&%(/*,**,..,,.,..       .,,**//**,*,,,*,////*,,.        .,.,...,,,**//#%&%%
 %%%&&%#/*,*,.    ...      ..         ...  ,.. .       .       ...   ..,,*/(#%&%%
 &&&&&%(((*.*... . .*,.   .           .*%%#(,.          .    .*,. ..,.,,**/(%#&%%
-Generated on: 2021-04-04
-Written by SurpriseDog at: https://github.com/SurpriseDog
-<<< All rights reserved unless otherwise stated >>>
 '''
